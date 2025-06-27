@@ -1,0 +1,10 @@
+langchain
+langchain_google_genai
+langchain-community
+langchain-core
+python-dotenv
+streamlit
+pinecone
+pypdf
+langchain_pinecone
+PyMuPDF
