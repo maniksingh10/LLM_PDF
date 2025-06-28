@@ -7,4 +7,5 @@ streamlit
 pinecone
 pypdf
 langchain_pinecone
-PyMuPDF
+PyPDF2
+FAISS

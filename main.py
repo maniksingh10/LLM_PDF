@@ -82,35 +82,57 @@ def get_local_answer():
 #get_local_answer('query')
 
 # Streamlit UI
-st.set_page_config(page_title="PDF Q&A RAG", layout="wide")
+st.set_page_config(page_title="PDF Q&A RAG", layout="centered")
 st.title("Chat with PDF")
 
-# Upload PDF
-uploaded_file = st.file_uploader("Upload a PDF", type="pdf")
+# Upload PDFs
+uploaded_files = st.file_uploader(
+    "Upload PDF(s)", 
+    type="pdf", 
+    accept_multiple_files=True
+)
 
-if uploaded_file:
-    st.success("PDF uploaded successfully!")
+if uploaded_files:
+    st.success(f"{len(uploaded_files)} PDF(s) uploaded successfully!")
 
-    # Extract text
-    raw_text = extract_text_from_pdf(uploaded_file)
+    current_filenames = [f.name for f in uploaded_files]
 
-    # Chunk text
-    docs = chunk_text(raw_text)
-    st.write(f"✅ Split into {len(docs)} chunks")
+    # Check if we need to process new files
+    need_reprocess = (
+        "vectorstore" not in st.session_state
+        or "uploaded_filenames" not in st.session_state
+        or st.session_state.uploaded_filenames != current_filenames
+    )
 
-    # Create vector store
-    vectorstore = create_vectorstore(docs)
-    st.success("✅ Document indexed in Pinecone")
+    if need_reprocess:
+        all_texts = []
+        for file in uploaded_files:
+            text = extract_text_from_pdf(file)
+            all_texts.append(text)
+
+        combined_text = "\n\n".join(all_texts)
+
+        docs = chunk_text(combined_text)
+        st.session_state.docs = docs
+        st.session_state.uploaded_filenames = current_filenames
+
+        st.write(f"✅ Split into {len(docs)} chunks from all PDFs")
+
+        with st.spinner("Indexing document(s) in Pinecone..."):
+            vectorstore = create_vectorstore(docs)
+            st.session_state.vectorstore = vectorstore
+        st.success("✅ Documents indexed in Pinecone")
+    else:
+        docs = st.session_state.docs
+        vectorstore = st.session_state.vectorstore
+        st.info("✅ Reusing existing vector store")
 
     # Input for question
-    query = st.text_input("Ask a question about this PDF:")
+    query = st.text_input("Ask a question about your PDFs:")
 
     if query:
         with st.spinner("Searching and generating answer..."):
-            # Retrieve similar chunks
             retrieved_docs = retrieve_docs(vectorstore, query)
-
-            # Generate answer
             answer = get_answer(retrieved_docs, query)
 
         st.subheader("Answer")
@@ -119,7 +141,5 @@ if uploaded_file:
         st.subheader("Top Matching Chunks")
         for i, doc in enumerate(retrieved_docs, 1):
             st.markdown(f"**Chunk {i}:** {doc.page_content[:300]}...")
-
 else:
-    st.info("Upload a PDF to get started.")
-
+    st.info("Upload one or more PDFs to get started.")
